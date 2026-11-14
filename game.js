@@ -3,23 +3,30 @@ import Phaser from "phaser";
 class WorldScene extends Phaser.Scene {
   constructor() {
     super("WorldScene");
+
+    this.mobileControls = {
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+    };
+
+    this.mobilePointers = new Map();
+    this.mobileButtons = {};
   }
 
   create() {
-    // WORLD SETTINGS
     this.worldWidth = 2400;
     this.worldHeight = 1800;
 
-    // CREATE GRASS BACKGROUND
+    // GRASS BACKGROUND
     const grass = this.add.graphics();
 
     grass.fillStyle(0x75ad48, 1);
     grass.fillRect(0, 0, this.worldWidth, this.worldHeight);
 
-    // CREATE GRASS DETAILS
     for (let i = 0; i < 700; i++) {
       const x = Phaser.Math.Between(0, this.worldWidth);
-
       const y = Phaser.Math.Between(0, this.worldHeight);
 
       const color = Phaser.Utils.Array.GetRandom([
@@ -30,61 +37,51 @@ class WorldScene extends Phaser.Scene {
       grass.fillRect(x, y, 4, 4);
     }
 
-    // CREATE PLAYER TEXTURE
+    // PLAYER TEXTURE
     const playerGraphics = this.make.graphics({
       x: 0,
       y: 0,
       add: false,
     });
 
-    // Shadow
     playerGraphics.fillStyle(0x000000, 0.25);
     playerGraphics.fillEllipse(16, 29, 22, 9);
 
-    // Body
     playerGraphics.fillStyle(0x2874c8);
     playerGraphics.fillRect(8, 15, 16, 13);
 
-    // Head
     playerGraphics.fillStyle(0xf2c18d);
     playerGraphics.fillRect(9, 3, 14, 13);
 
-    // Hair
     playerGraphics.fillStyle(0x513323);
     playerGraphics.fillRect(8, 2, 16, 5);
     playerGraphics.fillRect(8, 5, 3, 7);
 
-    // Eyes
     playerGraphics.fillStyle(0x222222);
     playerGraphics.fillRect(12, 9, 2, 2);
     playerGraphics.fillRect(19, 9, 2, 2);
 
-    // Arms
     playerGraphics.fillStyle(0xf2c18d);
     playerGraphics.fillRect(4, 16, 5, 10);
     playerGraphics.fillRect(23, 16, 5, 10);
 
-    // Legs
     playerGraphics.fillStyle(0x403b35);
     playerGraphics.fillRect(9, 27, 6, 6);
     playerGraphics.fillRect(17, 27, 6, 6);
 
     playerGraphics.generateTexture("player", 32, 36);
-
     playerGraphics.destroy();
 
-    // CREATE TREE TEXTURE
+    // TREE TEXTURE
     const treeGraphics = this.make.graphics({
       x: 0,
       y: 0,
       add: false,
     });
 
-    // Tree trunk
     treeGraphics.fillStyle(0x704323);
     treeGraphics.fillRect(17, 23, 14, 28);
 
-    // Tree leaves
     treeGraphics.fillStyle(0x246b36);
     treeGraphics.fillRect(7, 12, 34, 25);
 
@@ -95,10 +92,9 @@ class WorldScene extends Phaser.Scene {
     treeGraphics.fillRect(17, 7, 14, 10);
 
     treeGraphics.generateTexture("tree", 48, 52);
-
     treeGraphics.destroy();
 
-    // CREATE ROCK TEXTURE
+    // ROCK TEXTURE
     const rockGraphics = this.make.graphics({
       x: 0,
       y: 0,
@@ -112,19 +108,16 @@ class WorldScene extends Phaser.Scene {
     rockGraphics.fillRect(9, 3, 17, 10);
 
     rockGraphics.generateTexture("rock", 36, 28);
-
     rockGraphics.destroy();
 
-    // WORLD OBJECTS
+    // OBSTACLES
     this.obstacles = this.physics.add.staticGroup();
 
-    // RANDOM TREES
+    // TREES
     for (let i = 0; i < 65; i++) {
       const x = Phaser.Math.Between(80, this.worldWidth - 80);
-
       const y = Phaser.Math.Between(80, this.worldHeight - 80);
 
-      // Keep spawn area clear
       if (Phaser.Math.Distance.Between(x, y, 400, 400) < 150) {
         continue;
       }
@@ -136,10 +129,9 @@ class WorldScene extends Phaser.Scene {
       tree.setDepth(y);
     }
 
-    // RANDOM ROCKS
+    // ROCKS
     for (let i = 0; i < 30; i++) {
       const x = Phaser.Math.Between(80, this.worldWidth - 80);
-
       const y = Phaser.Math.Between(80, this.worldHeight - 80);
 
       const rock = this.obstacles.create(x, y, "rock");
@@ -149,7 +141,7 @@ class WorldScene extends Phaser.Scene {
       rock.setDepth(y);
     }
 
-    // CREATE PLAYER
+    // PLAYER
     this.player = this.physics.add.sprite(400, 400, "player");
 
     this.player.setDepth(400);
@@ -158,7 +150,6 @@ class WorldScene extends Phaser.Scene {
     this.player.body.setSize(18, 12);
     this.player.body.setOffset(7, 22);
 
-    // COLLISION
     this.physics.add.collider(this.player, this.obstacles);
 
     // WORLD BOUNDS
@@ -192,7 +183,7 @@ class WorldScene extends Phaser.Scene {
     this.playerName.setOrigin(0.5, 1);
     this.playerName.setDepth(10000);
 
-    // WELCOME MESSAGE
+    // WORLD TITLE
     this.add
       .text(400, 340, "GREEN VALLEY", {
         fontSize: "22px",
@@ -202,30 +193,171 @@ class WorldScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setScrollFactor(0);
+
+    // MOBILE CONTROLLER
+    this.createMobileControls();
   }
 
+  // CREATE MOBILE D-PAD
+  createMobileControls() {
+    const isTouchDevice =
+      "ontouchstart" in window || navigator.maxTouchPoints > 0;
+
+    if (!isTouchDevice) return;
+
+    // Additional touch pointers
+    this.input.addPointer(3);
+
+    const directions = [
+      { name: "up", icon: "▲" },
+      { name: "down", icon: "▼" },
+      { name: "left", icon: "◀" },
+      { name: "right", icon: "▶" },
+    ];
+
+    directions.forEach((direction) => {
+      const button = this.add.circle(0, 0, 27, 0x333333, 0.75);
+
+      button.setStrokeStyle(2, 0xffffff);
+      button.setScrollFactor(0);
+      button.setDepth(10000);
+      button.setInteractive();
+
+      const label = this.add.text(0, 0, direction.icon, {
+        fontSize: "23px",
+        color: "#ffffff",
+        fontStyle: "bold",
+      });
+
+      label.setOrigin(0.5);
+      label.setScrollFactor(0);
+      label.setDepth(10001);
+
+      this.mobileButtons[direction.name] = {
+        button,
+        label,
+      };
+
+      button.on("pointerdown", (pointer) => {
+        this.mobilePointers.set(pointer.id, direction.name);
+
+        this.updateMobileInput();
+      });
+    });
+
+    // RELEASE TOUCH
+    this.input.on("pointerup", (pointer) => {
+      this.mobilePointers.delete(pointer.id);
+      this.updateMobileInput();
+    });
+
+    // RELEASE IF POINTER MOVES OUTSIDE GAME
+    this.input.on("pointerupoutside", (pointer) => {
+      this.mobilePointers.delete(pointer.id);
+      this.updateMobileInput();
+    });
+
+    // RESET IF GAME LOSES FOCUS
+    this.input.on("gameout", () => {
+      this.mobilePointers.clear();
+      this.updateMobileInput();
+    });
+
+    this.positionMobileControls();
+
+    this.scale.on("resize", this.positionMobileControls, this);
+  }
+
+  // UPDATE TOUCH INPUT
+  updateMobileInput() {
+    Object.keys(this.mobileControls).forEach((direction) => {
+      const active = Array.from(this.mobilePointers.values()).includes(
+        direction,
+      );
+
+      this.mobileControls[direction] = active;
+
+      const objects = this.mobileButtons[direction];
+
+      if (objects) {
+        objects.button.setFillStyle(
+          active ? 0x888888 : 0x333333,
+          active ? 1 : 0.75,
+        );
+      }
+    });
+  }
+
+  // RESPONSIVE BUTTON POSITION
+  positionMobileControls() {
+    const spacing = 55;
+
+    const centerX = Math.max(90, Math.min(100, this.scale.width * 0.18));
+
+    const centerY = this.scale.height - 105;
+
+    const positions = {
+      up: {
+        x: centerX,
+        y: centerY - spacing,
+      },
+      down: {
+        x: centerX,
+        y: centerY + spacing,
+      },
+      left: {
+        x: centerX - spacing,
+        y: centerY,
+      },
+      right: {
+        x: centerX + spacing,
+        y: centerY,
+      },
+    };
+
+    Object.keys(positions).forEach((direction) => {
+      const objects = this.mobileButtons[direction];
+
+      if (!objects) return;
+
+      const position = positions[direction];
+
+      objects.button.setPosition(position.x, position.y);
+
+      objects.label.setPosition(position.x, position.y);
+    });
+  }
+
+  // GAME UPDATE
   update() {
     const speed = 180;
 
     let velocityX = 0;
     let velocityY = 0;
 
-    // MOVEMENT
-    if (this.keys.left.isDown || this.cursors.left.isDown) {
-      velocityX = -speed;
-    }
+    const left =
+      this.keys.left.isDown ||
+      this.cursors.left.isDown ||
+      this.mobileControls.left;
 
-    if (this.keys.right.isDown || this.cursors.right.isDown) {
-      velocityX = speed;
-    }
+    const right =
+      this.keys.right.isDown ||
+      this.cursors.right.isDown ||
+      this.mobileControls.right;
 
-    if (this.keys.up.isDown || this.cursors.up.isDown) {
-      velocityY = -speed;
-    }
+    const up =
+      this.keys.up.isDown || this.cursors.up.isDown || this.mobileControls.up;
 
-    if (this.keys.down.isDown || this.cursors.down.isDown) {
-      velocityY = speed;
-    }
+    const down =
+      this.keys.down.isDown ||
+      this.cursors.down.isDown ||
+      this.mobileControls.down;
+
+    if (left) velocityX = -speed;
+    if (right) velocityX = speed;
+
+    if (up) velocityY = -speed;
+    if (down) velocityY = speed;
 
     // NORMALIZE DIAGONAL MOVEMENT
     const velocity = new Phaser.Math.Vector2(velocityX, velocityY);
@@ -234,10 +366,10 @@ class WorldScene extends Phaser.Scene {
 
     this.player.setVelocity(velocity.x * speed, velocity.y * speed);
 
-    // UPDATE PLAYER DEPTH
+    // PLAYER DEPTH
     this.player.setDepth(this.player.y);
 
-    // UPDATE NAME POSITION
+    // PLAYER NAME
     this.playerName.setPosition(this.player.x, this.player.y - 35);
   }
 }
